@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { loadPosts } from "./load-posts.mjs";
-import { CATEGORIES } from "./categories.mjs";
+import { CATEGORIES, RETIRED } from "./categories.mjs";
 import { renderHome, renderListing } from "./render-index.mjs";
 import { renderArticle } from "./render-article.mjs";
 import { rss, atom, jsonFeed, sitemap } from "./feeds.mjs";
@@ -31,6 +31,11 @@ function papersOf(blogDir) {
   return out;
 }
 
+function oldSection(s) {
+  // First build: features, research, calendar-walks, recoveries.
+  return /-walk-|calendar-walk|oct-walk|-oct-1-|^\d{4}-\d{2}-\d{2}-(august|september|october)-\d/.test(s.source) || /Calendar (Walk|Day)/i.test(s.title) ? "calendar-walks" : "recoveries";
+}
+
 function blogSha() {
   try { return execFileSync("git", ["-C", BLOG, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { return "unknown"; }
 }
@@ -52,15 +57,24 @@ for (const l of listings) {
 }
 for (const s of stories) {
   write(storyPath(s), renderArticle(s, stories, papers));
-  if (!papers.has(s.slug)) sitePaths.push({ path: storyPath(s), lastmod: s.date });
+  if (!papers.has(s.source)) sitePaths.push({ path: storyPath(s), lastmod: s.date });
 }
 
 write("/about/", page({ title: "About the newsroom", description: SITE.description, path: "/about/", body: `<div class="wrap prose-page"><h1>About the newsroom</h1>
-<p>${SITE.name} publishes the stories behind <a href="${SITE.home}/">radioindex.org</a>, the archive of American Old-Time Radio: how lost broadcasts are found, dated and named, and what each day of the archive's calendar walk turns up.</p>
+<p>${SITE.name} publishes the stories behind <a href="${SITE.home}/">radioindex.org</a>, the archive of American old-time radio: how missing broadcasts are found, dated and named, and what the archive adds each day.</p>
 <p>Every story here is published from the radioindex.org blog. New posts appear in the newsroom automatically, usually within half an hour.</p>
 <h2>Follow along</h2><ul><li><a href="/rss.xml">RSS feed</a></li><li><a href="/atom.xml">Atom feed</a></li><li><a href="/feed.json">JSON Feed</a></li></ul></div>` }));
 sitePaths.push({ path: "/about/" });
 fs.writeFileSync(path.join(DIST, "404.html"), page({ title: "Page not found", description: "That page is not in the newsroom.", path: "/404", body: `<div class="wrap prose-page"><h1>Page not found</h1><p>That page is not in the newsroom. Try the <a href="/">latest news</a> or <a href="/latest/">all stories</a>.</p></div>` }).replace('<meta name="description"', '<meta name="robots" content="noindex">\n<meta name="description"'));
+
+// Earlier builds used the blog slug under the old section names; send those to the new URLs.
+const redirects = [];
+for (const s of stories) {
+  const old = `/${s.category === "news" ? oldSection(s) : s.category}/${s.source}/`;
+  if (old !== storyPath(s)) redirects.push(`${old} ${storyPath(s)} 301`);
+}
+for (const [from, to] of RETIRED) redirects.push(`/${from}/* /${to}/ 301`);
+write("_redirects", redirects.join("\n") + "\n");
 
 write("rss.xml", rss(stories));
 write("atom.xml", atom(stories));

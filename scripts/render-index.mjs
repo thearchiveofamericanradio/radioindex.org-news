@@ -30,7 +30,7 @@ export function renderHome(stories) {
   <section class="lead-row" aria-label="Top stories">
     ${teaser(lead, { size: "lead", heading: "h2" })}
     <div class="top-list">
-      <h2 class="rail-head">Latest news</h2>
+      <h2 class="rail-head">Latest</h2>
       ${top.map((s) => teaser(s, { size: "compact", heading: "h3" })).join("\n")}
     </div>
   </section>

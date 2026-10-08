@@ -2,8 +2,7 @@
 const HUES = new Map([
   ["features", ["#7a3a00", "#F08A0C"]],
   ["research", ["#001a66", "#0050EE"]],
-  ["calendar-walks", ["#2b1b4d", "#7d4cdb"]],
-  ["recoveries", ["#073b3a", "#0f8a7e"]],
+  ["news", ["#2b1b4d", "#7d4cdb"]],
 ]);
 
 function hash(s) {
