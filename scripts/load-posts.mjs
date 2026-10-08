@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { renderMarkdown, plain } from "./markdown.mjs";
 import { categoryFor } from "./categories.mjs";
 import { plainTerms, plainTermsHtml, plainHeadline } from "./plain-terms.mjs";
+import { plainBody } from "./plain-body.mjs";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -69,7 +70,9 @@ function items(text) {
 }
 
 function headlineAndDek(title, body) {
-  const clean = title.replace(/^Archival (Dispatch|Calendar Walk):\s*/, "").replace(/\s+/g, " ").trim();
+  const clean = title.replace(/^Archival (Dispatch|Calendar Walk):\s*/, "")
+    .replace(/(—\s*|:\s*|^)(?:Milestone |Final )?(?:Batch|Increment) \d+(?: Completion)?!?(?::\s*|,\s*|\s+(?=—))/g, "$1")
+    .replace(/\s+/g, " ").trim();
   const firstPara = body.split(/\n\s*\n/).map((p) => p.trim())
     .find((p) => p && !/^(#|\||-|\d+\.|\*\*[A-Z][\w ]+\*\*:|>|`|<)/.test(p) && p.length > 60) || "";
   const lead = plain(firstPara);
@@ -93,7 +96,7 @@ const TECHNICAL = /[0-9a-f]{8}-[0-9a-f]{4}|\.json|catalog\/|meta\/|`/i;
 /** Featured broadcasts from an archival inventory table: canonical title, year, synopsis. */
 function fromInventory(body) {
   const lines = body.split("\n");
-  const head = lines.findIndex((l) => /^\|.*Canonical/i.test(l));
+  const head = lines.findIndex((l) => /^\|(?:.*\|)?\s*\**(?:Canonical[^|]*|Title)\**\s*\|/i.test(l));
   if (head < 0) return [];
   const out = [];
   for (const row of lines.slice(head + 2)) {
@@ -114,11 +117,11 @@ function takeaways(body) {
   const listed = [...body.matchAll(/^#{3,4}\s+((?:[A-Z]|\d+)[.)]\s+.+)$/gm)].map((m) => m[1]).filter((t) => !TECHNICAL.test(t)).map(strip);
   if (listed.length >= 2) return listed.slice(0, 4);
   const h3 = [...body.matchAll(/^#{3,4}\s+(.+)$/gm)].map((m) => m[1]).filter((t) => !TECHNICAL.test(t)).map(strip);
-  const useful = h3.filter((t) => t.length > 24 && !/^(summary|overview|notes?|sources?|methodology|cardinal|quality)\b/i.test(t));
+  const useful = h3.filter((t) => t.length > 24 && !/^(summary|overview|notes?|sources?|methodology|cardinal|quality|broadcasts|highlights|synopses)\b/i.test(t) && !/\bupdate$/i.test(t));
   if (useful.length >= 3) return useful.slice(0, 4);
   const bullets = [...body.matchAll(/^(?:[-*]|\d+\.)\s+(.+)$/gm)].map((m) => m[1]).filter((t) => !TECHNICAL.test(t)).map(strip).filter((t) => t.length >= 30 && t.length <= 260);
   if (bullets.length >= 2) return bullets.slice(0, 4);
-  return [...body.matchAll(/^##\s+(.+)$/gm)].map((m) => strip(m[1])).filter((t) => t.length > 8 && !TECHNICAL.test(t)).slice(0, 4);
+  return [...body.matchAll(/^##\s+(.+)$/gm)].map((m) => strip(m[1])).filter((t) => t.length > 8 && !TECHNICAL.test(t) && !/^(broadcasts|highlights|synopses)$/i.test(t)).slice(0, 4);
 }
 
 const JARGON = /walk|batch|enrich|dispatch|recover|sweep|archival|solved|increment/;
@@ -165,18 +168,20 @@ export function loadPosts(blogDir, today) {
     // A calendar walk is named for the broadcast day it covers, which can be ahead
     // of the day it went up. Publish date is never in the future.
     const date = stated > today ? (added.get(slug) && added.get(slug) <= today ? added.get(slug) : today) : stated;
+    const section = categoryFor(slug, title);
+    if (section !== "research") body = plainBody(body);
     const { headline, dek } = headlineAndDek(title, body);
     const text = plain(body);
     const words = text.split(/\s+/).filter(Boolean).length;
     const author = !meta.author || /^radio ?index$/i.test(meta.author) ? "Radio Index Newsroom" : meta.author;
-    const tags = [...new Set((Array.isArray(meta.tags) ? meta.tags : []).map((t) => plainTerms(t)).filter((t) => !/^(day-by-day review|archival-enrichment|archival enrichment)$/i.test(t)))];
+    const tags = [...new Set((Array.isArray(meta.tags) ? meta.tags : []).map((t) => plainTerms(t)).filter((t) => !/^(day-by-day review|archival-enrichment|archival enrichment|update|this update|enrichment|asr|whisper|speech recognition|whisper speech recognition|newspaper-logs)$/i.test(t)))];
     return {
       source: slug, title, headline: plainTerms(headline), dek: plainTerms(clamp(dek || text, 240)), date, author,
       tags: tags.slice(0, 12),
-      category: categoryFor(slug, title),
+      category: section,
       takeaways: takeaways(body).map((t) => plainTerms(clamp(t, 200))),
       minutes: Math.max(1, Math.round(words / 230)),
-      html: plainTermsHtml(renderMarkdown(body)),
+      html: plainTermsHtml(renderMarkdown(body), { ops: section !== "research" }),
       summary: plainTerms(clamp(text, 300)),
     };
   });

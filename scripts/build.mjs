@@ -31,11 +31,6 @@ function papersOf(blogDir) {
   return out;
 }
 
-function oldSection(s) {
-  // First build: features, research, calendar-walks, recoveries.
-  return /-walk-|calendar-walk|oct-walk|-oct-1-|^\d{4}-\d{2}-\d{2}-(august|september|october)-\d/.test(s.source) || /Calendar (Walk|Day)/i.test(s.title) ? "calendar-walks" : "recoveries";
-}
-
 function blogSha() {
   try { return execFileSync("git", ["-C", BLOG, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { return "unknown"; }
 }
@@ -67,13 +62,15 @@ write("/about/", page({ title: "About the newsroom", description: SITE.descripti
 sitePaths.push({ path: "/about/" });
 fs.writeFileSync(path.join(DIST, "404.html"), page({ title: "Page not found", description: "That page is not in the newsroom.", path: "/404", body: `<div class="wrap prose-page"><h1>Page not found</h1><p>That page is not in the newsroom. Try the <a href="/">latest news</a> or <a href="/latest/">all stories</a>.</p></div>` }).replace('<meta name="description"', '<meta name="robots" content="noindex">\n<meta name="description"'));
 
-// Earlier builds used the blog slug under the old section names; send those to the new URLs.
+// Every path a story has been published at (data/past-paths.json) redirects to its current one.
+// Snapshot new paths with `npm run snapshot` before changing headline or slug rules.
+const past = JSON.parse(fs.readFileSync(path.join(ROOT, "data/past-paths.json"), "utf8"));
 const redirects = [];
 for (const s of stories) {
-  const old = `/${s.category === "news" ? oldSection(s) : s.category}/${s.source}/`;
-  if (old !== storyPath(s)) redirects.push(`${old} ${storyPath(s)} 301`);
+  for (const old of past[s.source] || []) if (old !== storyPath(s)) redirects.push(`${old} ${storyPath(s)} 301`);
 }
 for (const [from, to] of RETIRED) redirects.push(`/${from}/* /${to}/ 301`);
+if (redirects.length > 2000) throw new Error(`${redirects.length} redirects; Pages allows 2,000 static rules`);
 write("_redirects", redirects.join("\n") + "\n");
 
 write("rss.xml", rss(stories));

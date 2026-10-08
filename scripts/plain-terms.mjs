@@ -2,6 +2,8 @@
 // "dispatch", "recovery", "batch") is replaced with common terms, and
 // "old-time radio" is always hyphenated.
 
+import { OPS, dropNumbers } from "./plain-body.mjs";
+
 const MONTH = "(?:January|February|March|April|May|June|July|August|September|October|November|December)";
 
 function matchCase(found, word) {
@@ -25,17 +27,17 @@ const TERMS = [
   [/\brecover(y|ies|ed|ing|s)?\b/gi, (m, s = "") => ({ "": "restore", y: "restoration", ies: "restorations", ed: "restored", ing: "restoring", s: "restores" })[s.toLowerCase()]],
 ];
 
-/** Rewrites one plain-text string. */
-export function plainTerms(text) {
-  let out = String(text);
-  for (const [re, to] of TERMS) {
+/** Rewrites one plain-text string. ops adds the bookkeeping words (batch, enrichment, ...). */
+export function plainTerms(text, { ops = true } = {}) {
+  let out = ops ? dropNumbers(String(text)) : String(text);
+  for (const [re, to] of ops ? [...TERMS, ...OPS] : TERMS) {
     out = out.replace(re, (...args) => matchCase(args[0], typeof to === "function" ? to(...args) : to));
   }
   return out;
 }
 
 /** Rewrites only the text of an HTML fragment: never tags, attributes, code or pre. */
-export function plainTermsHtml(html) {
+export function plainTermsHtml(html, opts) {
   let skip = 0;
   return html.split(/(<[^>]+>)/).map((part) => {
     if (part.startsWith("<")) {
@@ -43,7 +45,7 @@ export function plainTermsHtml(html) {
       else if (/^<\/(code|pre)>/i.test(part)) skip = Math.max(0, skip - 1);
       return part;
     }
-    return skip ? part.replace(TERMS[0][0], (m) => matchCase(m, "old-time radio")) : plainTerms(part);
+    return skip ? part.replace(TERMS[0][0], (m) => matchCase(m, "old-time radio")) : plainTerms(part, opts);
   }).join("");
 }
 
