@@ -45,7 +45,8 @@ jobs:
         id: fresh
         if: github.event_name == 'schedule'
         run: |
-          live=$(curl -fsS "https://$DOMAIN/build.json" | jq -r .blog_sha || true)
+          # Read the pages.dev host: the radioindex.org zone may challenge GitHub runner IPs.
+          live=$(curl -sS -A "newsroom-publish" "https://$PROJECT.pages.dev/build.json" | jq -r .blog_sha 2>/dev/null || true)
           head=$(git -C blog rev-parse HEAD)
           echo "live=$live head=$head"
           if [ "$live" = "$head" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
