@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { renderMarkdown, plain } from "./markdown.mjs";
 import { categoryFor } from "./categories.mjs";
+import { plainTerms, plainTermsHtml, plainHeadline } from "./plain-terms.mjs";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,7 +74,8 @@ function headlineAndDek(title, body) {
     .find((p) => p && !/^(#|\||-|\d+\.|\*\*[A-Z][\w ]+\*\*:|>|`|<)/.test(p) && p.length > 60) || "";
   const lead = plain(firstPara);
   const parts = clean.split(/\s+—\s+/);
-  if (parts.length < 2) return { headline: clean, dek: lead };
+  if (parts.length < 2) return { headline: plainHeadline(clean), dek: lead };
+  parts[0] = plainHeadline(parts[0]);
   const subject = parts.slice(1).join(" — ").replace(/^100% (Enriched|Complete),?\s*/i, "");
   const list = items(subject);
   // Headline: "October 8 Calendar Walk: Don Larsen Perfect Game and 12 Postseason Baseball Classics"
@@ -82,7 +84,7 @@ function headlineAndDek(title, body) {
   const named = take === 2 ? `${list[0]} and ${list[1]}` : list[0];
   if (`${parts[0]}: ${named}`.length > 120) return { headline: parts[0], dek: subject };
   const restItems = list.slice(take);
-  const dek = restItems.length ? `Also in this dispatch: ${restItems.join(", ")}.` : lead;
+  const dek = restItems.length ? `Also featured: ${restItems.join(", ")}.` : lead;
   return { headline: `${parts[0]}: ${named}`, dek };
 }
 
@@ -119,6 +121,26 @@ function takeaways(body) {
   return [...body.matchAll(/^##\s+(.+)$/gm)].map((m) => strip(m[1])).filter((t) => t.length > 8 && !TECHNICAL.test(t)).slice(0, 4);
 }
 
+const JARGON = /walk|batch|enrich|dispatch|recover|sweep|archival|solved|increment/;
+
+function slugify(text) {
+  const words = text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim().split(" ");
+  let out = "";
+  for (const w of words) { if ((out + "-" + w).length > 72) break; out = out ? `${out}-${w}` : w; }
+  return out;
+}
+
+/** Public URL slug: the blog slug when it is already plain, else date plus headline. Stable across builds. */
+function assignSlugs(stories) {
+  const used = new Set();
+  for (const s of [...stories].sort((a, b) => a.source.localeCompare(b.source))) {
+    let slug = JARGON.test(s.source.slice(11)) ? `${s.source.slice(0, 10)}-${slugify(s.headline)}` : s.source;
+    for (let n = 2; used.has(slug); n++) slug = slug.replace(/-\d+$|$/, `-${n}`);
+    used.add(slug);
+    s.slug = slug;
+  }
+}
+
 export function clamp(text, max) {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
@@ -147,16 +169,18 @@ export function loadPosts(blogDir, today) {
     const text = plain(body);
     const words = text.split(/\s+/).filter(Boolean).length;
     const author = !meta.author || /^radio ?index$/i.test(meta.author) ? "Radio Index Newsroom" : meta.author;
+    const tags = [...new Set((Array.isArray(meta.tags) ? meta.tags : []).map((t) => plainTerms(t)).filter((t) => !/^(day-by-day review|archival-enrichment|archival enrichment)$/i.test(t)))];
     return {
-      slug, title, headline, dek: clamp(dek || text, 240), date, author,
-      tags: (Array.isArray(meta.tags) ? meta.tags : []).slice(0, 12),
+      source: slug, title, headline: plainTerms(headline), dek: plainTerms(clamp(dek || text, 240)), date, author,
+      tags: tags.slice(0, 12),
       category: categoryFor(slug, title),
-      takeaways: takeaways(body).map((t) => clamp(t, 200)),
+      takeaways: takeaways(body).map((t) => plainTerms(clamp(t, 200))),
       minutes: Math.max(1, Math.round(words / 230)),
-      html: renderMarkdown(body),
-      summary: clamp(text, 300),
+      html: plainTermsHtml(renderMarkdown(body)),
+      summary: plainTerms(clamp(text, 300)),
     };
   });
-  stories.sort((a, b) => (b.date === a.date ? b.slug.localeCompare(a.slug) : b.date.localeCompare(a.date)));
+  stories.sort((a, b) => (b.date === a.date ? b.source.localeCompare(a.source) : b.date.localeCompare(a.date)));
+  assignSlugs(stories);
   return stories;
 }

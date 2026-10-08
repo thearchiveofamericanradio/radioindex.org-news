@@ -40,7 +40,7 @@ for (const file of pages) {
   for (const m of html.matchAll(/href="(\/[^"]*)"/g)) need(exists(m[1]), `${rel}: broken link ${m[1]}`);
 }
 need(stories > 100, `only ${stories} story pages`);
-for (const f of ["rss.xml", "atom.xml", "sitemap.xml", "feed.json", "robots.txt", "404.html", "_headers", "build.json"]) need(fs.existsSync(path.join(DIST, f)), `missing ${f}`);
+for (const f of ["rss.xml", "atom.xml", "sitemap.xml", "feed.json", "robots.txt", "404.html", "_headers", "_redirects", "build.json"]) need(fs.existsSync(path.join(DIST, f)), `missing ${f}`);
 JSON.parse(fs.readFileSync(path.join(DIST, "feed.json"), "utf8"));
 need(/<rss version="2.0"/.test(fs.readFileSync(path.join(DIST, "rss.xml"), "utf8")), "rss root");
 need(/<feed xmlns="http:\/\/www.w3.org\/2005\/Atom">/.test(fs.readFileSync(path.join(DIST, "atom.xml"), "utf8")), "atom root");

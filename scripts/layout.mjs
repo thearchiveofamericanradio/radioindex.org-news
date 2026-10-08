@@ -8,7 +8,7 @@ export const SITE = {
   tagline: "Old-Time Radio",
   url: "https://news.radioindex.org",
   home: "https://www.radioindex.org",
-  description: "News, features and research from radioindex.org, the archive of American Old-Time Radio.",
+  description: "News, features and research from radioindex.org, the archive of American old-time radio.",
   publisher: "The Archive of American Radio",
 };
 
@@ -20,7 +20,7 @@ export function absolute(p) {
 }
 
 function nav(current) {
-  const items = [{ id: "", name: "All news", href: "/" }, ...CATEGORIES.map((c) => ({ id: c.id, name: c.name, href: `/${c.id}/` }))];
+  const items = [{ id: "", name: "Latest", href: "/" }, ...CATEGORIES.map((c) => ({ id: c.id, name: c.name, href: `/${c.id}/` }))];
   return items.map((i) => `<li><a href="${i.href}"${i.id === current ? ' aria-current="page"' : ""}>${esc(i.name)}</a></li>`).join("");
 }
 
