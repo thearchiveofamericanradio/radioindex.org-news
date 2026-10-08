@@ -1,0 +1,14 @@
+{
+  "name": "app-newsroom",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static newsroom for news.radioindex.org, built from the radioindex.org-blog posts.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "marked": "^18.0.10"
+  }
+}
